@@ -76,6 +76,7 @@ public abstract class NettyRemotingAbstract {
         new ConcurrentHashMap<Integer, ResponseFuture>(256);
 
     /**
+     * 这个Map保存每个request code的所有处理器，也就是说，对于每个传入的请求，我们可以在这个Map中查找响应处理器来处理请求。
      * This container holds all processors per request code, aka, for each incoming request, we may look up the
      * responding processor in this map to handle the request.
      */
@@ -88,6 +89,7 @@ public abstract class NettyRemotingAbstract {
     protected final NettyEventExecutor nettyEventExecutor = new NettyEventExecutor();
 
     /**
+     * 如果每个请求代码中的{@link #processorTable}中没有精确匹配，则使用的默认请求处理器。
      * The default request processor to use in case there is no exact match in {@link #processorTable} per request code.
      */
     protected Pair<NettyRequestProcessor, ExecutorService> defaultRequestProcessor;

@@ -78,6 +78,7 @@ public class RemotingCommand {
     private HashMap<String, String> extFields;
     private transient CommandCustomHeader customHeader;
 
+    // 默认：JSON格式。可指定为ROCKETMQ的自定义协议
     private SerializeType serializeTypeCurrentRPC = serializeTypeConfigInThisServer;
 
     private transient byte[] body;
@@ -325,6 +326,7 @@ public class RemotingCommand {
         return name;
     }
 
+    // 长度（4+请求头长度+报文长度） + 协议头长度 + 头内容 + 报文内容
     public ByteBuffer encode() {
         // 1> header length size
         int length = 4;

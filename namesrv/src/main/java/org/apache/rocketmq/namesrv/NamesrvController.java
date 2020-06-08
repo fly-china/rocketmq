@@ -49,6 +49,7 @@ public class NamesrvController {
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "NSScheduledThread"));
     private final KVConfigManager kvConfigManager;
+    // 路由信息管理器
     private final RouteInfoManager routeInfoManager;
 
     private RemotingServer remotingServer;
@@ -85,7 +86,7 @@ public class NamesrvController {
         this.registerProcessor();
 
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-
+            // 每隔10秒检测Broker是否健在
             @Override
             public void run() {
                 NamesrvController.this.routeInfoManager.scanNotActiveBroker();
@@ -147,7 +148,9 @@ public class NamesrvController {
             this.remotingServer.registerDefaultProcessor(new ClusterTestRequestProcessor(this, namesrvConfig.getProductEnvName()),
                 this.remotingExecutor);
         } else {
-
+            // DefaultRequestProcessor是NameServer的核心处理类
+            // 将处理器和线程池，注册为netty处理远程请求的处理器。
+            // 若有远程请求进来，则调用DefaultRequestProcessor.processRequest的方法，处理请求
             this.remotingServer.registerDefaultProcessor(new DefaultRequestProcessor(this), this.remotingExecutor);
         }
     }

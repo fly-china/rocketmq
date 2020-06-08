@@ -164,6 +164,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     private int consumeThreadMax = 20;
 
     /**
+     * 阈值用于动态调整线程池的数目
      * Threshold for dynamic adjustment of the number of thread pool
      */
     private long adjustThreadPoolNumsThreshold = 100000;

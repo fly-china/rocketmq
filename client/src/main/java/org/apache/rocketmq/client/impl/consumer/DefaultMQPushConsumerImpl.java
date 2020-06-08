@@ -631,6 +631,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                         null);
                 }
 
+                // 重点方法
                 mQClientFactory.start();
                 log.info("the consumer [{}] start OK.", this.defaultMQPushConsumer.getConsumerGroup());
                 this.serviceState = ServiceState.RUNNING;
@@ -1107,6 +1108,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     }
 
     public void adjustThreadPool() {
+        // 计算堆积未消费的消息数量
         long computeAccTotal = this.computeAccumulationTotal();
         long adjustThreadPoolNumsThreshold = this.defaultMQPushConsumer.getAdjustThreadPoolNumsThreshold();
 

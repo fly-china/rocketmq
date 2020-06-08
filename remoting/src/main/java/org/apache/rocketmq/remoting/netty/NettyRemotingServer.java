@@ -114,7 +114,9 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             }
         });
 
+        // 判断是否支持在linux下使用Epoll多路复用，否则使用jdk原生多路复用
         if (useEpoll()) {
+            // 1个boss线程
             this.eventLoopGroupBoss = new EpollEventLoopGroup(1, new ThreadFactory() {
                 private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -124,6 +126,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 }
             });
 
+            // 多路复用负责处理网络连接的selector线程
             this.eventLoopGroupSelector = new EpollEventLoopGroup(nettyServerConfig.getServerSelectorThreads(), new ThreadFactory() {
                 private AtomicInteger threadIndex = new AtomicInteger(0);
                 private int threadTotal = nettyServerConfig.getServerSelectorThreads();
@@ -193,12 +196,14 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 }
             });
 
+        // 初始化Netty中的单例（@Shareable）handler，准备启动时使用
         prepareSharableHandlers();
 
         ServerBootstrap childHandler =
             this.serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)
                 .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
                 .option(ChannelOption.SO_BACKLOG, 1024)
+                    // 允许重用旧链接的端口
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .option(ChannelOption.SO_KEEPALIVE, false)
                 .childOption(ChannelOption.TCP_NODELAY, true)
@@ -213,6 +218,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                             .addLast(defaultEventExecutorGroup,
                                 encoder,
                                 new NettyDecoder(),
+                                // 2分钟无读、无写，则触发NettyConnectManageHandler
                                 new IdleStateHandler(0, 0, nettyServerConfig.getServerChannelMaxIdleTimeSeconds()),
                                 connectionManageHandler,
                                 serverHandler
@@ -220,6 +226,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                     }
                 });
 
+        // 内存分配方式
         if (nettyServerConfig.isServerPooledByteBufAllocatorEnable()) {
             childHandler.childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
         }
@@ -236,6 +243,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             this.nettyEventExecutor.start();
         }
 
+        // 定时调用以扫描、清理已弃用的请求
         this.timer.scheduleAtFixedRate(new TimerTask() {
 
             @Override
@@ -343,9 +351,13 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
     }
 
     private void prepareSharableHandlers() {
+        // 链接握手处理器
         handshakeHandler = new HandshakeHandler(TlsSystemConfig.tlsMode);
+        // 自定义编码器
         encoder = new NettyEncoder();
+        // 连接管理处理器
         connectionManageHandler = new NettyConnectManageHandler();
+        // 业务处理
         serverHandler = new NettyServerHandler();
     }
 
@@ -363,6 +375,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
 
+            // 标记当前位置，以便我们可以查看第一个字节，以确定内容是否以TLS方式握手
             // mark the current position so that we can peek the first byte to determine if the content is starting with
             // TLS handshake
             msg.markReaderIndex();
@@ -397,17 +410,18 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 log.warn("Clients intend to establish an insecure connection while this server is running in SSL enforcing mode");
             }
 
+            // 重置读取器索引，以便握手可以正常进行。
             // reset the reader index so that handshake negotiation may proceed as normal.
             msg.resetReaderIndex();
 
             try {
-                // Remove this handler
+                // Remove this handler 处理完成上述操作后，移除本handler
                 ctx.pipeline().remove(this);
             } catch (NoSuchElementException e) {
                 log.error("Error while removing HandshakeHandler", e);
             }
 
-            // Hand over this message to the next .
+            // Hand over this message to the next .将消息传递给下一个handler处理
             ctx.fireChannelRead(msg.retain());
         }
     }
@@ -417,6 +431,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
+            // 处理接收到的消息
             processMessageReceived(ctx, msg);
         }
     }
@@ -425,6 +440,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
     class NettyConnectManageHandler extends ChannelDuplexHandler {
         @Override
         public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+            // 有新链接进入，装载此handler时，记录远程地址
             final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());
             log.info("NETTY SERVER PIPELINE: channelRegistered {}", remoteAddress);
             super.channelRegistered(ctx);
@@ -432,6 +448,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
         @Override
         public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
+            // 有新链接离开，卸载此handler时，记录远程地址
             final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());
             log.info("NETTY SERVER PIPELINE: channelUnregistered, the channel[{}]", remoteAddress);
             super.channelUnregistered(ctx);
@@ -462,10 +479,12 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
             if (evt instanceof IdleStateEvent) {
+                // 触发无读、无写时，对应的处理操作
                 IdleStateEvent event = (IdleStateEvent) evt;
                 if (event.state().equals(IdleState.ALL_IDLE)) {
                     final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());
                     log.warn("NETTY SERVER PIPELINE: IDLE exception [{}]", remoteAddress);
+                    // 关闭channel
                     RemotingUtil.closeChannel(ctx.channel());
                     if (NettyRemotingServer.this.channelEventListener != null) {
                         NettyRemotingServer.this

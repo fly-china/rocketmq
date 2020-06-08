@@ -28,6 +28,7 @@ public class NettyClientConfig {
     private long channelNotActiveInterval = 1000 * 60;
 
     /**
+     * 当在指定时间内既不执行读操作也不执行写操作时，将触发IdleStateEvent。指定{@code 0}来禁用
      * IdleStateEvent will be triggered when neither read nor write was performed for
      * the specified period of this time. Specify {@code 0} to disable
      */

@@ -18,6 +18,7 @@ package org.apache.rocketmq.remoting.netty;
 
 public class NettyServerConfig implements Cloneable {
     private int listenPort = 8888;
+    // netty的工作者线程数量
     private int serverWorkerThreads = 8;
     private int serverCallbackExecutorThreads = 0;
     private int serverSelectorThreads = 3;
@@ -25,7 +26,10 @@ public class NettyServerConfig implements Cloneable {
     private int serverAsyncSemaphoreValue = 64;
     private int serverChannelMaxIdleTimeSeconds = 120;
 
+
+    // netty中对于childOption的属性设置：ChannelOption.SO_SNDBUF，默认：65535=64K
     private int serverSocketSndBufSize = NettySystemConfig.socketSndbufSize;
+    // netty中对于childOption的属性设置：ChannelOption.SO_RCVBUF，默认：65535=64K
     private int serverSocketRcvBufSize = NettySystemConfig.socketRcvbufSize;
     private boolean serverPooledByteBufAllocatorEnable = true;
 
@@ -36,6 +40,7 @@ public class NettyServerConfig implements Cloneable {
      * ../glibc-2.10.1/configure \ --prefix=/usr \ --with-headers=/usr/include \
      * --host=x86_64-linux-gnu \ --build=x86_64-pc-linux-gnu \ --without-gd
      */
+    // epoll的多路IO复用机制
     private boolean useEpollNativeSelector = false;
 
     public int getListenPort() {
